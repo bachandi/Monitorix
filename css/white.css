@@ -12,15 +12,15 @@ body {
 
 table {
     background: #cccccc;
-    border-left: 1px outset #b2b2b2;
-    border-top: 1px outset #b2b2b2;
-    border-right: 1px outset #5b5b5b;
-    border-bottom: 1px outset #5b5b5b;
+    border-left: 0px outset #b2b2b2;
+    border-top: 0px outset #b2b2b2;
+    border-right: 0px outset #5b5b5b;
+    border-bottom: 0px outset #5b5b5b;
     border-spacing: 5px;
 }
 
 th, td {
-    border: 1px inset #888888;
+    border: 0px inset #888888;
     background-color: #777777;
     padding: 0;
 }
@@ -28,10 +28,10 @@ th, td {
 .cgi-header-table {
     background: #cccccc;
     border: 1px black;
-    border-left: 1px outset #b2b2b2;
-    border-top: 1px outset #b2b2b2;
-    border-right: 1px outset #5b5b5b;
-    border-bottom: 1px outset #5b5b5b;
+    border-left: 0px outset #b2b2b2;
+    border-top: 0px outset #b2b2b2;
+    border-right: 0px outset #5b5b5b;
+    border-bottom: 0px outset #5b5b5b;
     border-spacing: 5px;
     font-size: 24px;
 }
@@ -46,10 +46,10 @@ th, td {
 .table-module {
     background: #cccccc;
     border: 1px black;
-    border-left: 1px outset #b2b2b2;
-    border-top: 1px outset #b2b2b2;
-    border-right: 1px outset #5b5b5b;
-    border-bottom: 1px outset #5b5b5b;
+    border-left: 0px outset #b2b2b2;
+    border-top: 0px outset #b2b2b2;
+    border-right: 0px outset #5b5b5b;
+    border-bottom: 0px outset #5b5b5b;
     border-spacing: 5px;
 }
 
