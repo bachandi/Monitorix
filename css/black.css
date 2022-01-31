@@ -21,7 +21,7 @@ table {
 }
  
 th, td {
-    background: #333333;
+    background: #404040; /*Cell background*/
     border: 0px black;
     border-left: 0px inset #6f6f6f;
     border-top: 0px inset #6f6f6f;
@@ -49,7 +49,7 @@ th, td {
 }
  
 .table-module {
-    background: #888888;
+    background: #888888; /*Table lines*/
     border: 0px black;
     border-left: 0px outset #b2b2b2;
     border-top: 0px outset #b2b2b2;
@@ -59,7 +59,7 @@ th, td {
 }
  
 .td-title {
-    background-color: #333333;
+    background-color: #333333; /*Haeder background*/
     font-family: Verdana, sans-serif;
     color: #ffb709;
 }
