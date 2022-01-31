@@ -27,7 +27,7 @@ th, td {
 
 .cgi-header-table {
     background: #cccccc;
-    border: 1px black;
+    border: 0px black;
     border-left: 0px outset #b2b2b2;
     border-top: 0px outset #b2b2b2;
     border-right: 0px outset #5b5b5b;
@@ -45,7 +45,7 @@ th, td {
 
 .table-module {
     background: #cccccc;
-    border: 1px black;
+    border: 0px black;
     border-left: 0px outset #b2b2b2;
     border-top: 0px outset #b2b2b2;
     border-right: 0px outset #5b5b5b;
