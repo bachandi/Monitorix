@@ -175,6 +175,7 @@ sub disk_init {
 
 	$config->{disk_hist_alert1} = ();
 	$config->{disk_hist_alert2} = ();
+	$config->{disk_read_write_hist} = ();
 	push(@{$config->{func_update}}, $package);
 	logger("$myself: Ok") if $debug;
 }
@@ -185,12 +186,16 @@ sub disk_update {
 	my $rrd = $config->{base_lib} . $package . ".rrd";
 	my $disk = $config->{disk};
 	my $respect_standby = lc($disk->{respect_standby} || "") eq "y" ? 1 : 0;
+	my $check_only_on_disk_activity = lc($disk->{check_only_on_disk_activity} || "") eq "y" ? 1 : 0;
+	my $io_read_threshold = ($disk->{io_read_threshold} || 0);
+	my $io_write_threshold = ($disk->{io_write_threshold} || 0);
 	my $use_nan_for_missing_data = lc($disk->{use_nan_for_missing_data} || "") eq "y" ? 1 : 0;
 
 	my $temp;
 	my $smart1;
 	my $smart2;
 
+	my $i_disk_list = 0;
 	my $n;
 	my $rrdata = "N";
 
@@ -212,54 +217,149 @@ sub disk_update {
 					$d = abs_path(dirname($d) . "/" . readlink($d));
 					chomp($d);
 				}
-				my $smartctl_options = "-A";
-				if($respect_standby) {
-					$smartctl_options .= " -n standby";
+
+
+				my $io_read;
+				my $io_write;
+				my $io_read_str = $i_disk_list . "_io_r" . $n;
+				my $io_write_str = $i_disk_list . "_io_w" . $n;
+
+				if($check_only_on_disk_activity) {
+					# Logic to read the disk stats is copied from fs.pm.
+					# The read_sec and write_sec values are superfluous for this module.
+					my @tmp;
+
+					my $read_cnt;
+					my $read_sec;
+					my $write_cnt;
+					my $write_sec;
+					my @d_tmp = split('/', $d);
+					my $device_name = $d_tmp[-1];
+					if($device_name) {
+						if($config->{os} eq "Linux") {
+							if($config->{kernel} gt "2.4") {
+								if(open(IN, "/proc/diskstats")) {
+									while(<IN>) {
+										if(/ $device_name /) {
+											@tmp = split(' ', $_);
+											last;
+										}
+									}
+									close(IN);
+								}
+								(undef, undef, undef, $read_cnt, undef, undef, $read_sec, $write_cnt, undef, undef, $write_sec) = @tmp;
+							} else {
+								my $io;
+								open(IN, "/proc/stat");
+								while(<IN>) {
+									if(/^disk_io/) {
+										(undef, undef, $io) = split(':', $_);
+										last;
+									}
+								}
+								close(IN);
+								(undef, $read_cnt, $read_sec, $write_cnt, $write_sec) = split(',', $io);
+								$write_sec =~ s/\).*$//;
+							}
+						} elsif($config->{os} eq "FreeBSD") {
+							@tmp = split(' ', `iostat -xI '$device_name' | grep -w '$device_name'`);
+							if(@tmp) {
+								(undef, $read_cnt, $write_cnt, $read_sec, $write_sec) = @tmp;
+								$read_cnt = int($read_cnt);
+								$write_cnt = int($write_cnt);
+								$read_sec = int($read_sec);
+								$write_sec = int($write_sec);
+							} else {
+								@tmp = split(' ', `iostat -dI | tail -1`);
+								(undef, $read_cnt, $read_sec) = @tmp;
+								$write_cnt = 0;
+								$write_sec = 0;
+								chomp($read_sec);
+								$read_sec = int($read_sec);
+							}
+						} elsif($config->{os} eq "OpenBSD" || $config->{os} eq "NetBSD") {
+							@tmp = split(' ', `iostat -DI | tail -1`);
+							($read_cnt, $read_sec) = @tmp;
+							$write_cnt = 0;
+							$write_sec = 0;
+							chomp($read_sec);
+							$read_sec = int($read_sec);
+						}
+					}
+
+					if(defined($read_cnt)) {
+						$io_read = ($read_cnt || 0);
+						my $val = $io_read;
+						$io_read = $val - ($config->{disk_read_write_hist}->{$io_read_str} || 0);
+						$io_read = 0 unless $val != $io_read;
+						$config->{disk_read_write_hist}->{$io_read_str} = $val;
+					}
+
+					if(defined($write_cnt)) {
+						$io_write = ($write_cnt || 0);
+						my $val = $io_write;
+						$io_write = $val - ($config->{disk_read_write_hist}->{$io_write_str} || 0);
+						$io_write = 0 unless $val != $io_write;
+						$config->{disk_read_write_hist}->{$io_write_str} = $val;
+					}
+
+					logger("$myself: DEBUG: $d: io_read=$io_read (io_read_threshold=$io_read_threshold), io_write=$io_write (io_write_threshold=$io_write_threshold)") if $debug;
 				}
 
-				open(IN, "smartctl $smartctl_options $d |");
-				while(<IN>) {
-					if(/^  5/ && /Reallocated_Sector_Ct/) {
-						my @tmp = split(' ', $_);
-						$smart1 = $tmp[9];
-						chomp($smart1);
+				if(!$check_only_on_disk_activity || ((defined($io_read) && $io_read > $io_read_threshold) || (defined($io_write) && $io_write > $io_write_threshold))) {
+					my $smartctl_options = "-A";
+					if($respect_standby) {
+						$smartctl_options .= " -n standby";
 					}
-					if(/^194/ && /Temperature_Celsius/) {
-						my @tmp = split(' ', $_);
-						$temp = $tmp[9];
-						chomp($temp);
+
+					open(IN, "smartctl $smartctl_options $d |");
+					while(<IN>) {
+						if(/^  5/ && /Reallocated_Sector_Ct/) {
+							my @tmp = split(' ', $_);
+							$smart1 = $tmp[9];
+							chomp($smart1);
+						}
+						if(/^194/ && /Temperature_Celsius/) {
+							my @tmp = split(' ', $_);
+							$temp = $tmp[9];
+							chomp($temp);
+						}
+						if(/^190/ && /Airflow_Temperature_Cel/) {
+							my @tmp = split(' ', $_);
+							$temp = $tmp[9] unless ($temp && !isnan($temp));
+							chomp($temp);
+						}
+						if(/^197/ && /Current_Pending_Sector/) {
+							my @tmp = split(' ', $_);
+							$smart2 = $tmp[9];
+							chomp($smart2);
+						}
+						if(/^Current Drive Temperature: /) {
+							my @tmp = split(' ', $_);
+							$temp = $tmp[3] unless ($temp && !isnan($temp));
+							chomp($temp);
+						}
+						if(/^Temperature: /) {
+							my @tmp = split(' ', $_);
+							$temp = $tmp[1] unless ($temp && !isnan($temp));
+							chomp($temp);
+						}
 					}
-					if(/^190/ && /Airflow_Temperature_Cel/) {
-						my @tmp = split(' ', $_);
-						$temp = $tmp[9] unless ($temp && !isnan($temp));
-						chomp($temp);
+					close(IN);
+					if(!$temp && !$respect_standby) {
+						if(open(IN, "hddtemp -wqn $d |")) {
+							$temp = <IN>;
+							close(IN);
+						} else {
+							logger("$myself: 'smartctl' failed to get data from '$d' and 'hddtemp' seems doesn't exist.");
+						}
 					}
-					if(/^197/ && /Current_Pending_Sector/) {
-						my @tmp = split(' ', $_);
-						$smart2 = $tmp[9];
-						chomp($smart2);
+					chomp($temp);
+					if(defined($config->{disk_read_write_hist}->{$io_read_str})) {
+						$config->{disk_read_write_hist}->{$io_read_str} += 1; # The smart call has to be accounted for.
 					}
-					if(/^Current Drive Temperature: /) {
-						my @tmp = split(' ', $_);
-						$temp = $tmp[3] unless ($temp && !isnan($temp));
-						chomp($temp);
-					}
-					if(/^Temperature: /) {
-						my @tmp = split(' ', $_);
-						$temp = $tmp[1] unless ($temp && !isnan($temp));
-						chomp($temp);
-					}
+					logger("$myself: DEBUG: smart readout called temp=$temp") if $debug;
 				}
-				close(IN);
-				if(!$temp && !$respect_standby) {
-					if(open(IN, "hddtemp -wqn $d |")) {
-						$temp = <IN>;
-						close(IN);
-					} else {
-						logger("$myself: 'smartctl' failed to get data from '$d' and 'hddtemp' seems doesn't exist.");
-					}
-				}
-				chomp($temp);
 			}
 			$rrdata .= ":$temp";
 			$rrdata .= ":$smart1";
@@ -291,6 +391,7 @@ sub disk_update {
 				}
 			}
 		}
+		$i_disk_list++;
 	}
 
 	RRDs::update($rrd, $rrdata);

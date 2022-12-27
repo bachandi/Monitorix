@@ -2357,9 +2357,30 @@ Default value: \fIn\fP
 .P
 .BI respect_standby
 .RS
-This option, when enabled via \fIy\fP, won't wake up disks if they are already in standby but also won't report new smart during standby.
+This option, when enabled via \fIy\fP, won't wake up disks if they are already in standby but also won't report new smart data during standby.
 .P
 Default value: \fIn\fP
+.RE
+.P
+.BI check_only_on_disk_activity
+.RS
+This option, when enabled via \fIy\fP, will only readout the smart values if there was read or write activity on the drive since the last update call. The thresholds can to be configured via \fIio_read_threshold\fP and \fIio_write_threshold\fP. This way disks won't be prevented from going in standby but also won't report new smart data during inactivity. You might want to combine this with the \fIrespect_standby\fP option.
+.P
+Default value: \fIn\fP
+.RE
+.P
+.BI io_read_threshold
+.RS
+Threshold on IO read counts since last update. Can be set to fINaN\fP to disable it.
+.P
+Default value: \fI0\fP
+.RE
+.P
+.BI io_write_threshold
+.RS
+Threshold on IO write counts since last update. Can be set to fINaN\fP to disable it.
+.P
+Default value: \fI0\fP
 .RE
 .P
 .BI use_nan_for_missing_data
